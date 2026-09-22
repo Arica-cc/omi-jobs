@@ -117,11 +117,9 @@ body{
 .search-input-row input::placeholder{ color:var(--ink-faint); }
 
 .chip-row{
-  display:flex; gap:8px; overflow-x:auto;
+  display:flex; flex-wrap:wrap; gap:8px;
   padding-bottom:2px;
-  scrollbar-width:none;
 }
-.chip-row::-webkit-scrollbar{ display:none; }
 .chip{
   flex:none;
   font-family:"IBM Plex Mono", monospace;
