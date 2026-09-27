@@ -165,6 +165,16 @@ body{
   border-radius:6px;
   letter-spacing:.02em;
 }
+.card-tag.jd-match{
+  color:var(--ink-faint);
+  background:var(--surface-2);
+}
+mark{
+  background:var(--amber-soft);
+  color:var(--accent-ink);
+  border-radius:3px;
+  padding:0 1px;
+}
 .card-id{
   font-family:"IBM Plex Mono", monospace;
   font-size:11px;
@@ -314,6 +324,14 @@ function renderChips(){
 function escapeHtml(s){
   return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
+function escapeRegex(s){
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+function highlight(escapedText, q){
+  if (!q) return escapedText;
+  const re = new RegExp('(' + escapeRegex(q) + ')', 'ig');
+  return escapedText.replace(re, '<mark>$1</mark>');
+}
 
 const list = document.getElementById('list');
 const empty = document.getElementById('empty');
@@ -321,11 +339,24 @@ const statsEl = document.getElementById('stats');
 
 function render(){
   const q = (document.getElementById('searchInput').value || '').trim().toLowerCase();
-  const filtered = JOBS.filter(j => {
+
+  let filtered = JOBS.filter(j => {
     if (activeCat && j.cat !== activeCat) return false;
     if (!q) return true;
     return j.title.toLowerCase().includes(q) || j.jd.toLowerCase().includes(q);
   });
+
+  // 有关键字时:标题命中的排在前面(最相关),仅描述里命中的排后面,
+  // 且给后者打上"命中于描述"的提示,避免看起来像误匹配。
+  if (q){
+    filtered = filtered
+      .map((j, idx) => ({ j, idx, titleHit: j.title.toLowerCase().includes(q) }))
+      .sort((a, b) => {
+        if (a.titleHit !== b.titleHit) return a.titleHit ? -1 : 1;
+        return a.idx - b.idx; // 稳定排序,组内保持原顺序
+      })
+      .map(x => x.j);
+  }
 
   statsEl.textContent = `显示 ${filtered.length} / ${JOBS.length} 个职位`;
 
@@ -336,24 +367,31 @@ function render(){
   }
   empty.hidden = true;
 
-  list.innerHTML = filtered.map(j => `
+  list.innerHTML = filtered.map(j => {
+    const titleHit = q ? j.title.toLowerCase().includes(q) : false;
+    const jdOnlyHit = q && !titleHit;
+    const titleHtml = highlight(escapeHtml(j.title), q);
+    const jdHtml = highlight(escapeHtml(j.jd), q);
+    return `
     <div class="card">
       <div class="card-top">
         <span class="card-tag">${escapeHtml(j.cat)}</span>
         <span class="card-id">#${escapeHtml(j.id)}</span>
       </div>
-      <h3>${escapeHtml(j.title)}</h3>
+      <h3>${titleHtml}</h3>
       <div class="badge-row">
         ${j.salary ? `<span class="salary">${escapeHtml(j.salary)}</span>` : ''}
         ${j.location ? `<span class="location">📍 ${escapeHtml(j.location)}</span>` : ''}
+        ${jdOnlyHit ? `<span class="card-tag jd-match">命中于描述</span>` : ''}
       </div>
-      <div class="jd" id="jd-${j.id}">${escapeHtml(j.jd)}</div>
+      <div class="jd" id="jd-${j.id}">${jdHtml}</div>
       <div class="card-actions">
         <button class="toggle-btn" data-id="${j.id}">展开全文 ▾</button>
         <a class="apply-btn" href="https://t.me/y666899y" target="_blank" rel="noopener">投递 / 咨询 ↗</a>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   list.querySelectorAll('.toggle-btn').forEach(btn => {
     btn.addEventListener('click', () => {
