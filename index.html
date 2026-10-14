@@ -237,6 +237,25 @@ mark{
   display:flex; align-items:center; gap:4px;
 }
 .toggle-btn:hover{ color:var(--ink); }
+.right-actions{ display:flex; align-items:center; gap:8px; }
+.copy-btn{
+  font-family:"IBM Plex Sans", sans-serif;
+  font-weight:600;
+  font-size:13.5px;
+  color:var(--accent-ink);
+  background:var(--accent-soft);
+  border:none; border-radius:10px;
+  padding:9px 14px;
+  cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px;
+  white-space:nowrap;
+  transition:background .12s ease, color .12s ease;
+}
+.copy-btn:hover{ filter:brightness(1.04); }
+.copy-btn.copied{
+  background:var(--accent);
+  color:#fff;
+}
 .apply-btn{
   font-family:"IBM Plex Sans", sans-serif;
   font-weight:600;
@@ -387,7 +406,10 @@ function render(){
       <div class="jd" id="jd-${j.id}">${jdHtml}</div>
       <div class="card-actions">
         <button class="toggle-btn" data-id="${j.id}">展开全文 ▾</button>
-        <a class="apply-btn" href="https://t.me/y666899y" target="_blank" rel="noopener">投递 / 咨询 ↗</a>
+        <div class="right-actions">
+          <button class="copy-btn" data-id="${j.id}">📋 JD复制</button>
+          <a class="apply-btn" href="https://t.me/y666899y" target="_blank" rel="noopener">投递 / 咨询 ↗</a>
+        </div>
       </div>
     </div>
   `;
@@ -400,6 +422,52 @@ function render(){
       btn.textContent = isExpanded ? '收起 ▴' : '展开全文 ▾';
     });
   });
+
+  list.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-id');
+      const job = JOBS.find(j => String(j.id) === String(id));
+      if (!job) return;
+      const parts = [job.title];
+      if (job.salary) parts.push(job.salary);
+      if (job.location) parts.push('📍 ' + job.location);
+      parts.push('');
+      parts.push(job.jd);
+      const text = parts.join('\n');
+      copyText(text, btn);
+    });
+  });
+}
+
+function copyText(text, btn){
+  const showCopied = () => {
+    const original = btn.dataset.label || btn.textContent;
+    btn.dataset.label = original;
+    btn.textContent = '✓ 已复制';
+    btn.classList.add('copied');
+    clearTimeout(btn._copyTimer);
+    btn._copyTimer = setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(showCopied).catch(() => fallbackCopy(text, showCopied));
+  } else {
+    fallbackCopy(text, showCopied);
+  }
+}
+
+function fallbackCopy(text, onDone){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try { document.execCommand('copy'); onDone(); } catch(e) {}
+  document.body.removeChild(ta);
 }
 
 document.getElementById('searchInput').addEventListener('input', render);
